@@ -49,22 +49,36 @@ print(mmcls.__version__)
 
 ## 使用MMCls预训练模型
 MMCls提供很多预训练好的模型，这些模型都在ImageNet数据集上获得了state-of-art的结果
+
 可以直接使用这些模型进行推理计算
+
 在使用预训练模型之前，需要进行以下操作：
+
 准备模型
+
     准备config配置文件
+    
     准备模型权重参数文件
+    
 构建模型
+
 进行推理计算
 
 
 ## 准备模型文件
+
 预训练模型通过配置文件和权重参数文件来定义。
+
 配置文件定义了模型结构，权重参数文件保存了训练好的模型参数。
+
 在GitHub上的MMCls通过不同的页面来提供预训练模型。
+
 比如，MobileNetV2的配置文件和权重参数文件在这个链接下https://github.com/open-mmlab/mmclassification/tree/master/configs/mobilenet_v2
+
 在安装mmcls时就已经将配置文件安装到了本地，但是还需要手动下载模型权重参数文件
+
 为方便起见将权重参数文件统一保存到checkpoints文件夹下
+
 !mkdir checkpoints
 !wget https://download.openmmlab.com/mmclassification/v0/resnet/resnet50_batch256_imagenet_20200708-cfb998bf.pth -P checkpoints
 
@@ -76,20 +90,31 @@ MMCls提供很多预训练好的模型，这些模型都在ImageNet数据集上�
 from mmcls.apis import inference_model, init_model, show_result_pyplot
 
 # Specify the path to config file and checkpoint file
+
+指明配置文件和权重参数文件的路径
 config_file = 'configs/resnet/resnet50_b32x8_imagenet.py'
 checkpoint_file = 'checkpoints/resnet50_batch256_imagenet_20200708-cfb998bf.pth'
+
+
 # Specify the device. You may also use cpu by `device='cpu'`.
+
+指明设备，如果没有开启GPU，可以使用CPU device=’cpu'
 device = 'cuda:0'
+
 # Build the model from a config file and a checkpoint file
+通过配置文件和权重参数文件构建模型，这里的model是nn.model的子类
 model = init_model(config_file, checkpoint_file, device=device)
 
-
+展示示例图像的分类结果，预测的类别和预测的精度
 # Test a single image
 img = 'demo/demo.JPEG'
 result = inference_model(model, img)
 
+可视化结果
 # Show the results
 show_result_pyplot(model, img, result)
+
+
 
 from mmcls.datasets.pipelines import Compose
 from mmcv.parallel import collate, scatter
@@ -114,11 +139,41 @@ with torch.no_grad():
 # Show the feature, it is a 1280-dim vector
 print(features.shape)
 
+下载数据集
+这里使用猫狗分类数据集作为示例，可以在kaggle上找到
+
+这个数据集包含8000张训练图像和2000张测试图像，一共两个类别（猫和狗）
 !wget https://www.dropbox.com/s/ckv2398yoy4oiqy/cats_dogs_dataset.zip?dl=0 -O cats_dogs_dataset.zip
 !mkdir data
 !unzip -q cats_dogs_dataset.zip -d ./data/cats_dogs_dataset/
 
+解压后数据集的目录结构
+
+data/cats_dogs_dataset
+├── training_set
+│   ├── training_set
+│   │   ├── cats
+│   │   │   ├── cat.1.jpg
+│   │   │   ├── cat.2.jpg
+│   │   │   ├── ...
+│   │   ├── dogs
+│   │   │   ├── dog.1.jpg
+│   │   │   ├── dog.2.jpg
+│   │   │   ├── ...
+├── test_set
+│   ├── test_set
+│   │   ├── cats
+│   │   │   ├── cat.4001.jpg
+│   │   │   ├── cat.4002.jpg
+│   │   │   ├── ...
+│   │   ├── dogs
+│   │   │   ├── dog.4001.jpg
+│   │   │   ├── dog.4002.jpg
+│   │   │   ├── ...
+
+
 # Let's take a look at the dataset
+获取一张图像的可视化
 import mmcv
 import matplotlib.pyplot as plt
 
@@ -126,6 +181,83 @@ img = mmcv.imread('data/cats_dogs_dataset/training_set/training_set/cats/cat.1.j
 plt.figure(figsize=(8, 6))
 plt.imshow(mmcv.bgr2rgb(img))
 plt.show()
+
+
+支持新的数据集
+MMClassification要求数据集必须将图像和标签放在同级目录下，
+
+有两种方式可以支持自定义数据集
+
+1.将数据集转换成现有的数据集格式（比如ImageNet）
+2.新建一个新的数据集类
+
+
+
+命令行工具使用
+
+MMCLS提供了命令行工具，提供如下功能
+1.模型训练
+2.模型微调
+3.模型测试
+4.对立计算
+
+模型训练的过程和模型微调的过程一致
+
+模型微调
+通过命令行进行模型微调的步骤如下
+1.准备自定义数据集
+2.数据集适配MMCls要求
+3.在py脚本中修改配置文件
+4.使用命令行工具进行模型微调
+
+在py脚本中修改配置文件
+为了能够复用不同配置文件中常用的部分，支持多配置文件继承
+比如模型微调MobileNetV2,新的配置文件可以通过继承configs/base/models/mobilenet_v2_1x.py来创建模型的节点结构
+继承的py文件使用之前定义好的数据集
+继承configs/base/schedules/..来自定义学习率策略
+为了能够运行设定的学习率策略，还需要继承configs/base/default_runtime.py
+
+也可以不使用这种继承的方式，直接构建完整的配置文件，如configs/mnist/lenet5.py
+
+
+
+
+
+
+使用命令进行模型微调
+
+使用tools/train.py进行模型微调，这里使用resnet50和数据集CatsDogsDataset作为示例
+
+!python tools/train.py configs/resnet/resnet50_cats_dogs.py --work-dir work_dirs/resnet50_cats_dogs
+
+
+
+测试模型
+使用tools/test.py对模型进行测试
+
+可选参数
+--metrics:评价方式，依赖于数据集,如准确率a
+
+--metrics-options:对于评估过程的自定义操作，如topk=1
+
+!python tools/test.py configs/resnet/resnet50_cats_dogs.py work_dirs/resnet50_cats_dogs/latest.pth --metrics=accuracy --metric-options=topk=1
+
+
+推理计算
+可选参数
+RESULT_FILE:输出结果的文件名，如果不指定，计算结果不会被保存
+
+!python tools/test.py configs/resnet/resnet50_cats_dogs.py work_dirs/resnet50_cats_dogs/latest.pth --out=results.json
+
+
+
+
+
+
+
+
+
+
 
 import shutil
 import os
@@ -153,7 +285,7 @@ for cls_dir in class_dirs:
     for val_img in val_imgs:
         shutil.move(osp.join(src_dir, val_img), osp.join(tar_dir, val_img))
         
-        import shutil
+import shutil
 import os
 import os.path as osp
 
